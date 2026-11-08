@@ -9,10 +9,7 @@
 from __future__ import annotations
 
 import argparse
-import http.server
-import io
 import json
-import zipfile
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -35,6 +32,16 @@ EXCLUDE_DIRS = {
 }
 EXCLUDE_FILES = {".DS_Store", ".gitignore", "Thumbs.db"}
 EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log", ".tmp"}
+PUBLIC_FILES = {
+    "index.html",
+    "favicon.svg",
+    "favicon.ico",
+    "favicon-16.png",
+    "favicon-32.png",
+    "favicon-48.png",
+    "apple-touch-icon.png",
+    "release/CC-2.0.zip",
+}
 
 ROOT_ORDER = (
     "README.md",
@@ -206,10 +213,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def translate_path(self, path: str) -> str:
         full = Path(super().translate_path(path)).resolve()
-        if full != ROOT and ROOT in full.parents:
-            parts = full.relative_to(ROOT).parts
-            if any(part in EXCLUDE_DIRS for part in parts[:-1]) or full.name in EXCLUDE_FILES:
-                return str(ROOT / "__blocked__")
+        if full == ROOT:
+            return str(full)
+        if ROOT not in full.parents or full.relative_to(ROOT).as_posix() not in PUBLIC_FILES:
+            return str(ROOT / "__blocked__")
         return str(full)
 
     def _safe(self, rel: str) -> Path | None:
@@ -235,20 +242,16 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path == "/__download_all.zip":
-            buffer = io.BytesIO()
-            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as bundle:
-                for item in collect():
-                    bundle.write(ROOT / item["path"], f"{ROOT.name}/{item['path']}")
-            self._send(buffer.getvalue(), f"{ROOT.name}-all.zip")
-            return
         if parsed.path.startswith("/__download/"):
             rel = unquote(parsed.path[len("/__download/") :])
+            if rel != "release/CC-2.0.zip":
+                self.send_error(404, "only the release archive is downloadable")
+                return
             target = self._safe(rel)
             if target is None:
                 self.send_error(404, "file not available")
                 return
-            self._send(target.read_bytes(), target.name)
+            self._send(target.read_bytes(), "CC-2.0.zip")
             return
         super().do_GET()
 
