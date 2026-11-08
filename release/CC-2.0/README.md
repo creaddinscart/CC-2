@@ -68,6 +68,67 @@ Every local address is discovered and ranked. **A global IPv6 address is selecte
 Open the transport picker to switch, or enter a custom IP for any other VPN adapter.
 The app displays the exact `IP:port` to share, with IPv6 brackets added automatically.
 
+### Publishing through an FRP exit
+
+Behind NAT / CGNAT with no reachable public address? Do exactly what you would for a **Minecraft
+server**: download a third-party FRP client (`frpc`), map a port on your public FRP server to the
+room's local port, and you are done. **CC-2.0 does not generate or run `frpc`.** It only needs to
+know the public address and port that peers should connect to.
+
+```
+peer  --->  frps:25565  === FRP tunnel ===>  frpc  --->  127.0.0.1:9001 (room server)
+```
+
+**1. Configure the tunnel in your own FRP client.** A plain `tcp` proxy, same as a Minecraft
+server mapping. Example `frpc.toml` (yours may use `frpc.ini`):
+
+```toml
+serverAddr = "frp.example.com"
+serverPort = 7000
+
+[[proxies]]
+name = "cc2"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 9001
+remotePort = 25565
+```
+
+`localPort` must match the room's local port. `remotePort` is the port you share with peers; the two
+do not have to be equal. Start `frpc` and keep it running while the room is open.
+
+**2. Tell CC-2.0 the public exit.** Terminal UI: **Main menu / FRP Exit** (or the **FRP Exit**
+button on the Create Room form). Enter one address, switch FRP on, click **Save**:
+
+```
+frp.example.com:25565
+```
+
+Headless server, one flag:
+
+```bash
+python3 cc2_server.py --name "Night Shift" --port 9001 --password mypass --frp frp.example.com:25565
+```
+
+**3. Peers join normally**: enter `frp.example.com` + port `25565`, click **Check Room**, then
+enter the password. They need no FRP software and never see your local port.
+
+Rules worth knowing:
+
+- The `frps` control port, auth token, proxy name and TLS settings belong to your FRP client.
+  CC-2.0 never asks for them and writes no config files.
+- Do **not** enable the FRP PROXY protocol for this proxy; it prepends bytes that break the CC-2.0
+  framing. Plain `tcp` is what CC-2.0 expects.
+- Open `remotePort` on the FRP server's firewall / security group.
+- In FRP mode the room server binds to `0.0.0.0` so `frpc` can reach it. The password is still
+  required for every peer. `--frp-check` optionally probes the exit after startup.
+- Because tunneled connections arrive from loopback, FRP rooms **do not** grant host rights by
+  loopback username. A host joining a headless FRP room must paste the printed
+  `Host admin token` into the **Admin token** field on the Join Room form.
+
+The FRP server only ever sees ciphertext: the room password and the encryption key never leave the
+clients. See [USAGE.md](USAGE.md) for the full walkthrough.
+
 ---
 
 ## 3. Workflow
@@ -107,6 +168,8 @@ Wrong passwords, full rooms and duplicate usernames are rejected with clear mess
 - **Fully mouse-driven terminal**: buttons, input fields, the transport list, the file browser and
   the member list are all clickable under curses. TAB / arrows / ENTER / ESC work too.
 - **Headless server**: keep a room online on a machine with no interactive session.
+- **FRP exit**: publish a local room through a public FRP server. Configure `frpc` yourself like a
+  Minecraft server; CC-2.0 only needs the public `host:port` to show peers.
 
 ---
 
@@ -145,6 +208,7 @@ cc2/
   crypto.py                   End-to-end encryption and key derivation
   protocol.py                 Length-prefixed JSON protocol / room probe
   netdetect.py                IPv6 / IPv4 / VPN / LAN discovery and ranking
+  frp.py                      FRP public exit parsing and endpoint handling
   server.py                   Temporary room server
   client.py                   Client networking, chunked files, event queue
   config.py                   Local profile and download directory
@@ -173,8 +237,8 @@ Python 3.9+ is still required on the target machine.
 ## 8. Tests
 
 ```bash
-python3 tests/selftest.py       # 27 checks: crypto, probe, password, chat, typing, files, cap, framing
-python3 tests/tui_smoke.py      # 8 checks: pty-driven terminal UI with real mouse clicks
+python3 tests/selftest.py       # 50 checks: crypto, probe, password, chat, typing, files, cap, FRP, framing
+python3 tests/tui_smoke.py      # 9 checks: pty-driven terminal UI with real mouse clicks
 python3 launch.py --test        # both suites
 ```
 
@@ -201,6 +265,11 @@ python3 tests/selftest.py
 8. **Terminal looks cramped**: resize to at least 72 columns x 22 rows.
 9. **Mouse clicks do nothing**: use a terminal with mouse reporting (iTerm2, Terminal.app,
    Windows Terminal, gnome-terminal, xterm) and keep the keyboard shortcuts as a fallback.
+10. **FRP exit does not answer**: start `frpc` after the room is running, open `remotePort` on the
+    FRP server, and confirm `localPort` matches the room port. A failed `--frp-check` can also be a
+    router hairpin limitation - peers may still be able to connect.
+11. **FRP guests cannot reach the room**: do not enable the FRP PROXY protocol, and make sure the
+    room server is bound to `0.0.0.0` (automatic when FRP is enabled).
 
 ---
 

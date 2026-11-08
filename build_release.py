@@ -60,6 +60,32 @@ are all clickable with the mouse inside the terminal. TAB, arrows, ENTER and ESC
 work as well. IPv6 global addresses are preferred; public IPv4, VPN / Radmin VPN
 and LAN are selectable. All traffic is end-to-end encrypted.
 
+## No public IP? Use an FRP exit
+
+Set it up exactly like a Minecraft server, in your OWN third-party FRP client.
+CC-2.0 does not install, configure or run frpc - it only needs the public
+host:port that guests connect to.
+
+1. In your FRP client add a plain tcp proxy, e.g. frpc.toml:
+
+       [[proxies]]
+       type = "tcp"
+       localIP = "127.0.0.1"
+       localPort = 9001
+       remotePort = 25565
+
+   localPort must equal the CC-2.0 room port; remotePort is what you share.
+2. Start frpc and keep it running.
+3. In CC-2.0: Main menu / **FRP Exit**, enter `frp.example.com:25565`,
+   switch FRP on and click Save. Then create the room.
+4. Guests join `frp.example.com` + port `25565`. They need no FRP software.
+
+Headless: `python3 cc2_server.py --port 9001 --password pw --frp frp.example.com:25565`
+
+Use a plain tcp proxy (never the FRP PROXY protocol). In FRP rooms, a host
+joining a headless room must paste the printed admin token into the
+**Admin token** field. Full walkthrough: USAGE.md, section 6F.
+
 ## Optional
 
 `python3 -m pip install -r requirements.txt` enables AES-256-GCM and, on Windows,

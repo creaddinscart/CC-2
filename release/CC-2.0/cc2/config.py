@@ -25,6 +25,8 @@ DEFAULTS = {
     "default_max_users": 8,
     "download_dir": str(DOWNLOAD_DIR),
     "preferred_kind": "auto",
+    "frp_enabled": False,
+    "frp_endpoint": "",
 }
 
 

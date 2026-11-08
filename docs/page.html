@@ -194,7 +194,7 @@ footer a { color: var(--muted); margin: 0 8px; }
 
 <section class="hero" id="top">
   <div class="top">
-    <div class="wrap"><span>CC-2.0 / ChatClient</span><div><a href="#how-to-use">How to use</a><a href="#start">Guide</a><a href="#downloads">Download</a></div></div>
+    <div class="wrap"><span>CC-2.0 / ChatClient</span><div><a href="#how-to-use">How to use</a><a href="#start">Guide</a><a href="#frp">FRP</a><a href="#downloads">Download</a></div></div>
   </div>
   <div class="wrap hero-in">
     <div class="mark">
@@ -205,7 +205,7 @@ footer a { color: var(--muted); margin: 0 8px; }
     <div class="log">
       <a href="#downloads"><span>Terminal Edition 1.0.0 released</span><i>11-07</i></a>
       <a href="#how-to-use"><span>One ZIP contains everything</span><i>11-07</i></a>
-      <a href="#reference"><span>MPL-2.0 license added</span><i>11-07</i></a>
+      <a href="#frp"><span>FRP exit publishing added</span><i>11-08</i></a>
       <a class="more" href="#start">More &gt;</a>
     </div>
     <div class="rounds">
@@ -266,7 +266,7 @@ footer a { color: var(--muted); margin: 0 8px; }
     <div class="flow">
       <div><b>Your terminal</b><p>curses client, local key derivation, file picker.</p><ul><li><b>Password</b> never leaves the client</li><li><b>Key</b> from password + room salt</li><li><b>Plaintext</b> stays in RAM</li></ul></div>
       <div class="mid"><b>Temporary room server</b><p>Bound to your chosen port. Stops when the room closes.</p><ul><li><b>Sees</b> ciphertext, usernames, timestamps</li><li><b>Stores</b> a separate auth verifier</li><li><b>Cannot</b> recover the message key</li><li><b>Cannot</b> read text or files</li></ul></div>
-      <div><b>Peer terminals</b><p>Connect by IP + port, probe, then unlock with the password.</p><ul><li><b>IPv6</b> preferred</li><li><b>Caps</b> negotiated across members</li><li><b>History</b> replayed as ciphertext</li></ul></div>
+      <div><b>Peer terminals</b><p>Connect by IP + port, probe, then unlock with the password.</p><ul><li><b>IPv6</b> preferred</li><li><b>FRP exit</b> when NAT blocks inbound</li><li><b>History</b> replayed as ciphertext</li></ul></div>
     </div>
     <p class="note"><b>Trust model.</b> The password is the only key source and must be shared out of band. If any member lacks the optional <code>cryptography</code> package, the whole room falls back to the built-in HMAC-CTR cipher.</p>
   </section>
@@ -294,8 +294,8 @@ footer a { color: var(--muted); margin: 0 8px; }
 <span class="p">$</span> python3 launch.py --test</pre></div></div>
     <ol class="steps">
       <li><div><h3>Choose a username</h3><p>On first run, pick a username. It is saved in <code>~/.cc2/config.json</code>. The menu also has a Change Username button.</p></div></li>
-      <li><div><h3>Host: create a room</h3><p>Enter room name, port, communication IP, password and maximum members. IPv6 global is preferred; the transport list is auto-detected. Creating the room starts the temporary server and opens chat.</p><div class="chips"><span class="chip">Name <b>night-shift</b></span><span class="chip">Port <b>7777</b></span><span class="chip">Cap <b>8</b></span></div></div></li>
-      <li><div><h3>Guest: check the room</h3><p>Enter the host's IP + port and click Check Room. The room replies with its name, host, member count and capacity. Only then is the password requested.</p></div></li>
+      <li><div><h3>Host: create a room</h3><p>Enter room name, port, communication IP, password and maximum members. IPv6 global is preferred; the transport list is auto-detected. Behind NAT, click FRP Exit to publish a public address. Creating the room starts the temporary server and opens chat.</p><div class="chips"><span class="chip">Name <b>night-shift</b></span><span class="chip">Port <b>7777</b></span><span class="chip">Cap <b>8</b></span></div></div></li>
+      <li><div><h3>Guest: check the room</h3><p>Enter the host's IP + port (or the FRP server address + remote port) and click Check Room. The room replies with its name, host, member count and capacity. Only then is the password requested.</p></div></li>
       <li><div><h3>Chat and send files</h3><p>Type and press ENTER. Peers see who is typing. Click File to open the picker; files are encrypted, chunked and reassembled into <code>~/Downloads/CC-2.0/</code>. TAB, arrows, ENTER and ESC work as keyboard alternatives.</p></div></li>
       <li><div><h3>Host: tune the room</h3><p>Change the member cap at any time, kick a member, or close the room. Closing stops the temporary server.</p></div></li>
     </ol>
@@ -310,7 +310,30 @@ footer a { color: var(--muted); margin: 0 8px; }
       <li><div><b>LAN</b><small>local network</small></div><span>Same Wi-Fi or Ethernet. Simplest for one building.</span></li>
       <li><div><b>Loopback</b><small>local testing</small></div><span>127.0.0.1 / ::1 for a single-machine test with two terminals.</span></li>
     </ol>
-    <p class="note"><b>If a peer cannot connect:</b> check the firewall, port forwarding, VPN membership and the advertised IP. Use <code>python3 cc2_server.py --list-addresses</code> to see what the host detects.</p>
+    <p class="note"><b>If a peer cannot connect:</b> check the firewall, port forwarding, VPN membership and the advertised IP. Use <code>python3 cc2_server.py --list-addresses</code> to see what the host detects. With no reachable address at all, use an <a href="#frp">FRP exit</a>.</p>
+  </section>
+
+  <section id="frp">
+    <h2>FRP exit</h2>
+    <p>No public IP or stuck behind CGNAT? Set it up <b>exactly like a Minecraft server</b>: download a third-party FRP client, map a public port to the room's local port, and start it. CC-2.0 does not install, configure or run <code>frpc</code> - it only needs the public <code>host:port</code> that guests connect to.</p>
+    <div class="code"><div class="codebar"><span>topology</span></div><pre>guest --&gt; frps:25565 == tunnel ==&gt; frpc --&gt; 127.0.0.1:9001 (room)</pre></div>
+    <ol class="plain">
+      <li>In <b>your own FRP client</b>, add a plain <code>tcp</code> proxy. Set <code>localPort</code> to the CC-2.0 room port and <code>remotePort</code> to the public port you will share. The two can differ.</li>
+      <li>Start <code>frpc</code> and keep it running. Its server address, control port, token and proxy name stay in your FRP client - CC-2.0 never asks for them and writes no config files.</li>
+      <li>In CC-2.0 open <b>Main menu / FRP Exit</b> (or the FRP Exit button on the Create Room form) and enter one address: <code>frp.example.com:25565</code>. Switch FRP on and click Save.</li>
+      <li>Guests enter that host + port, click Check Room, then enter the password. They need no FRP software and never see your local port.</li>
+    </ol>
+    <div class="code"><div class="codebar"><span>frpc.toml in your own FRP client</span><button class="copy" type="button">copy</button></div><pre>serverAddr = "frp.example.com"
+serverPort = 7000
+
+[[proxies]]
+name = "cc2"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 9001
+remotePort = 25565</pre></div>
+    <div class="code"><div class="codebar"><span>headless host</span><button class="copy" type="button">copy</button></div><pre><span class="p">$</span> python3 cc2_server.py --name "Night Shift" --port 9001 --password 'long-password' --frp frp.example.com:25565</pre></div>
+    <p class="note"><b>Note.</b> This is the same mapping you would use for a Minecraft server on <code>25565</code>. Keep <code>frpc</code> running and open the remote port on the FRP server firewall. Use a plain <code>tcp</code> proxy: the FRP PROXY protocol prepends bytes that break CC-2.0 framing. In FRP rooms host rights require the admin token printed by the headless server; paste it into the Admin token field on the Join Room form. The FRP server only relays ciphertext, never the password or the key.</p>
   </section>
 
   <section id="downloads">
@@ -339,6 +362,8 @@ footer a { color: var(--muted); margin: 0 8px; }
           <tr><td>python3 launch.py</td><td>Mode menu</td></tr>
           <tr><td>python3 cc2_cli.py</td><td>Terminal client</td></tr>
           <tr><td>python3 cc2_server.py --list-addresses</td><td>Detected addresses</td></tr>
+          <tr><td>python3 cc2_server.py --frp H:P</td><td>Publish a public FRP exit</td></tr>
+          <tr><td>frpc -c frpc.toml</td><td>Start the tunnel in your own FRP client</td></tr>
           <tr><td>python3 build_release.py</td><td>Rebuild the ZIP</td></tr>
           <tr><td>python3 build_docs.py</td><td>Rebuild this page</td></tr>
           <tr><td>python3 build_favicon.py</td><td>Rebuild the icons</td></tr>
@@ -351,6 +376,8 @@ footer a { color: var(--muted); margin: 0 8px; }
           <li><b>Windows curses error</b> - install <code>windows-curses</code>.</li>
           <li><b>Old messages unreadable</b> - a new password makes a new key; cached history is skipped.</li>
           <li><b>No AES-GCM</b> - the room falls back to HMAC-CTR automatically.</li>
+          <li><b>FRP exit silent</b> - start frpc, open the remote port, keep localPort equal to the room port.</li>
+          <li><b>FRP probe malformed</b> - disable the FRP PROXY protocol on that proxy.</li>
         </ul>
       </div>
       <div>
@@ -361,6 +388,8 @@ footer a { color: var(--muted); margin: 0 8px; }
           <li>No forward secrecy, no identity check beyond the shared password.</li>
           <li>Share the password over a different channel than the address.</li>
           <li>Closing the room stops the server and drops in-memory state.</li>
+          <li>An FRP server relays ciphertext only. It cannot read messages or files.</li>
+          <li>FRP rooms require the admin token for host rights.</li>
         </ul>
         <h3 style="margin-top:24px">Build</h3>
         <ul>
@@ -371,7 +400,7 @@ footer a { color: var(--muted); margin: 0 8px; }
         </ul>
       </div>
     </div>
-    <p class="tail">27 / 27 core protocol checks &middot; 8 / 8 terminal mouse checks &middot; {{RELEASE_COUNT}} files in the release package.</p>
+    <p class="tail">50 / 50 core protocol checks &middot; 9 / 9 terminal mouse checks &middot; {{RELEASE_COUNT}} files in the release package.</p>
   </section>
 
 </div>
@@ -379,7 +408,7 @@ footer a { color: var(--muted); margin: 0 8px; }
 
 <footer>
   <div class="wrap">
-    <a href="#top">CC-2.0 / ChatClient</a><a href="#how-to-use">How to use</a><a href="#start">Guide</a><a href="#downloads">Download</a><a href="#reference">Reference</a>
+    <a href="#top">CC-2.0 / ChatClient</a><a href="#how-to-use">How to use</a><a href="#start">Guide</a><a href="#frp">FRP</a><a href="#downloads">Download</a><a href="#reference">Reference</a>
     <div style="margin-top:10px">Jointly built by Creaddinscart Teams &amp; CC Team &middot; MPL-2.0 &middot; generated {{GENERATED}}</div>
   </div>
 </footer>

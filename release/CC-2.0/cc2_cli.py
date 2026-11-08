@@ -15,12 +15,14 @@ import threading
 import time
 import unicodedata
 from dataclasses import dataclass, field as dc_field
+from pathlib import Path
 
 from cc2 import config as cfg
 from cc2 import netdetect
 from cc2.brand import APP_NAME, BANNER, CREDIT, FOOTER, SITE_NAME, TAGLINE
 from cc2.client import ChatClient, ClientError
 from cc2.crypto import has_aes_gcm
+from cc2.frp import FRPConfig, FRPError, split_address
 from cc2.server import RoomConfig, RoomServer, RoomError
 
 MIN_W, MIN_H = 72, 22
@@ -156,6 +158,13 @@ class App:
         self.peer_typing = ""
         self.cipher_mode = ""
         self._colors: dict[str, int] = {}
+        saved = cfg.load()
+        self.frp_enabled = bool(saved.get("frp_enabled"))
+        self.frp_endpoint = str(saved.get("frp_endpoint") or "")
+        self.frp_local_port = int(saved.get("last_port") or 9001)
+        self.frp_return = "create"
+        self.admin_token = ""
+        self.frp_live = False
 
     def setup(self) -> None:
         try:
@@ -379,6 +388,20 @@ class App:
         self.addr_pick = pick
         return "addresses"
 
+    def go_frp(self, back: str) -> str:
+        self.frp_return = back
+        return "frp"
+
+    def frp_config(self, local_port: int) -> FRPConfig | None:
+        if not self.frp_enabled:
+            return None
+        return FRPConfig.from_endpoint(self.frp_endpoint, local_port)
+
+    def save_frp(self) -> None:
+        data = cfg.load()
+        data.update({"frp_enabled": self.frp_enabled, "frp_endpoint": self.frp_endpoint})
+        cfg.save(data)
+
     def say(self, text: str) -> None:
         self.status = text
         self.status_ts = time.time()
@@ -436,16 +459,17 @@ class App:
             y = 11
             x = self.button(y, x, "Create Room", lambda: "create")
             x = self.button(y, x, "Join Room", lambda: "join")
+            self.button(y, x, "FRP Exit", lambda: self.go_frp("menu"), self.color("dim"))
             x = self.button(y + 2, 6, "Network Interfaces", lambda: self.go_addresses(False))
             self.button(y + 2, 30, "Change Username", lambda: "username", self.color("dim"))
             self.button(y + 2, 52, "Quit", lambda: "quit", self.color("dim"))
             self.draw(16, 6, "A room IS a temporary server on the creator's machine. Peers connect directly", self.color("dim"))
-            self.draw(17, 6, "over IPv6, public IPv4, VPN (e.g. Radmin VPN), or LAN. No central server, no logs.", self.color("dim"))
+            self.draw(17, 6, "over IPv6, IPv4, VPN / LAN, or through a public FRP exit. No central server, no logs.", self.color("dim"))
             self.draw(19, 6, CREDIT, self.color("dim"))
             self.footer_status()
             self.stdscr.refresh()
             result = self.handle_base(self.key(), back="quit")
-            if result in ("create", "join", "addresses", "username", "quit"):
+            if result in ("create", "join", "addresses", "username", "frp", "quit"):
                 return result
 
     def screen_addresses(self, pick: bool = False) -> str:
@@ -526,6 +550,75 @@ class App:
             if result == "cancel":
                 return ""
 
+    def screen_frp(self) -> str:
+        f_exit = Field("FRP exit", self.frp_endpoint, 0, 0, 46, hint="frp.example.com:25565")
+        while True:
+            self.frame("FRP exit / public address")
+            self.start_fields([f_exit])
+            self.draw(2, 4, clip("Set up the tunnel in YOUR OWN frpc client, like a Minecraft server. CC only needs the public exit.", self.w - 8), self.color("dim"))
+            f_exit.y, f_exit.x = 4, 6
+            self.field(f_exit)
+            state = "ENABLED" if self.frp_enabled else "OFF"
+            x = self.button(6, 6, f"FRP: {state}", lambda: "toggle", self.color("ok") if self.frp_enabled else self.color("dim"))
+            x = self.button(6, x, "Save", lambda: "save")
+            x = self.button(6, x, "Check Exit", lambda: "check", self.color("dim"))
+            self.button(6, x, "Back", lambda: "back", self.color("dim"))
+            port = None
+            if self.frp_endpoint.strip():
+                try:
+                    _, port = split_address(self.frp_endpoint)
+                except FRPError:
+                    port = None
+            exit_text = self.frp_endpoint if self.frp_enabled and self.frp_endpoint else "not published"
+            self.draw(8, 6, "In your frpc client add a tcp proxy, the same as for a Minecraft server:", self.color("accent"))
+            self.draw(9, 6, f"  localPort  = {self.frp_local_port}    <- this room's local port", self.color("ok"))
+            self.draw(10, 6, f"  remotePort = {port or '?'}    <- the port in the FRP exit above", self.color("ok"))
+            self.draw(11, 6, "Start frpc, keep it running, then create the room.", self.color("dim"))
+            self.draw(13, 6, clip(f"Local: 127.0.0.1:{self.frp_local_port}    Peers use: {exit_text}", self.w - 10), self.color("ok") if self.frp_enabled else 0)
+            self.draw(14, 6, "Guests enter the FRP host + that port. Their port can differ from yours.", self.color("dim"))
+            self.draw(15, 6, "Plain tcp proxy only. Never enable the FRP PROXY protocol.", self.color("dim"))
+            self.draw(16, 6, "The FRP server only sees ciphertext. Host rights need the admin token.", self.color("dim"))
+            self.footer_status()
+            self.stdscr.refresh()
+            result = self.handle_base(self.key(), back="back")
+            if isinstance(result, tuple) and result[0] == "enter":
+                result = "save"
+            if result == "toggle":
+                self.frp_enabled = not self.frp_enabled
+                self.say("FRP exit " + ("enabled" if self.frp_enabled else "disabled"))
+                continue
+            if result in ("save", "back", "check"):
+                if result == "check" and not self.frp_enabled:
+                    self.say("Enable FRP first.")
+                    continue
+                conf = None
+                if self.frp_enabled:
+                    try:
+                        conf = FRPConfig.from_endpoint(f_exit.value, self.frp_local_port)
+                    except FRPError as exc:
+                        self.say(str(exc))
+                        continue
+                    self.frp_endpoint = conf.endpoint
+                    f_exit.value = conf.endpoint
+                    f_exit.pos = len(f_exit.value)
+                else:
+                    self.frp_endpoint = f_exit.value.strip()
+                self.save_frp()
+                if result == "back":
+                    return self.frp_return
+                if result == "check":
+                    self.say("Checking FRP exit...")
+                    self.stdscr.refresh()
+                    info = conf.probe_exit(3.0)
+                    self.say(
+                        f"FRP exit is live: {info.get('name')}" if info
+                        else "No answer from the FRP exit. Check frpc and the remote port."
+                    )
+                    self.frp_live = bool(info)
+                    continue
+                self.say("FRP settings saved.")
+                continue
+
     def screen_create(self) -> str:
         saved = cfg.load()
         f_name = Field("Room name", str(saved.get("last_room_name") or "My Private Room"), 0, 0, 30)
@@ -537,7 +630,7 @@ class App:
         while True:
             self.frame("Create a room = start a temporary server")
             self.start_fields([f_name, f_port, f_pass, f_max])
-            self.draw(2, 4, "The room lives only on your computer. Others connect directly to the address below.", self.color("dim"))
+            self.draw(2, 4, "The room lives only on your computer. Others connect directly or through an FRP exit.", self.color("dim"))
             f_name.y, f_name.x = 4, 6
             f_port.y, f_port.x = 5, 6
             f_pass.y, f_pass.x = 6, 6
@@ -549,17 +642,30 @@ class App:
             self.button(9, 17, label[:44], lambda: self.go_addresses(True))
             self.draw(10, 6, clip(netdetect.transport_note(self.opts()), self.w - 10), self.color("dim"))
             self.draw(11, 6, clip(f"Note: {self.selected.note}" if self.selected else "", self.w - 10), self.color("dim"))
-            x = self.button(13, 6, "Create Room", lambda: "go")
-            x = self.button(13, x, "Change Transport", lambda: self.go_addresses(True), self.color("dim"))
-            self.button(13, x, "Back", lambda: "menu", self.color("dim"))
-            self.draw(15, 6, f"Share with peers:  {netdetect.format_endpoint(self.selected.ip if self.selected else '127.0.0.1', int(f_port.value or 0))}", self.color("ok"))
-            self.draw(16, 6, "Peers enter IP + port, the app checks the room, then asks for the password.", self.color("dim"))
+            frp_label = f"ON  {self.frp_endpoint}" if self.frp_enabled else "OFF (direct)"
+            x = self.button(12, 6, "FRP exit:", lambda: self.go_frp("create"), self.color("ok") if self.frp_enabled else self.color("dim"))
+            self.draw(12, x, frp_label[:40], self.color("ok") if self.frp_enabled else 0)
+            x = self.button(14, 6, "Create Room", lambda: "go")
+            x = self.button(14, x, "Change Transport", lambda: self.go_addresses(True), self.color("dim"))
+            x = self.button(14, x, "FRP Exit", lambda: self.go_frp("create"), self.color("dim"))
+            self.button(14, x, "Back", lambda: "menu", self.color("dim"))
+            if self.frp_enabled:
+                self.draw(16, 6, clip(f"Local port: {f_port.value}   |   Peers via FRP: {self.frp_endpoint}", self.w - 10), self.color("ok"))
+                self.draw(17, 6, "Set localPort = your room port in frpc, keep it running, then share the FRP exit.", self.color("dim"))
+            else:
+                self.draw(16, 6, f"Share with peers:  {netdetect.format_endpoint(self.selected.ip if self.selected else '127.0.0.1', int(f_port.value or 0))}", self.color("ok"))
+                self.draw(17, 6, "Peers enter IP + port, the app checks the room, then asks for the password.", self.color("dim"))
             self.footer_status()
             self.stdscr.refresh()
             result = self.handle_base(self.key(), back="menu")
             if isinstance(result, tuple) and result[0] == "enter":
                 result = "go"
-            if result in ("addresses", "menu"):
+            if result in ("addresses", "frp", "menu"):
+                if result == "frp":
+                    try:
+                        self.frp_local_port = int(f_port.value.strip())
+                    except ValueError:
+                        self.frp_local_port = 9001
                 return result
             if result == "go":
                 try:
@@ -577,14 +683,21 @@ class App:
                     self.say("A room password is required (it derives the encryption key).")
                     continue
                 ip = self.selected.ip if self.selected else "127.0.0.1"
+                try:
+                    frp = self.frp_config(port)
+                except FRPError as exc:
+                    self.say(str(exc))
+                    continue
+                bind = "0.0.0.0" if frp else netdetect.bind_address_for(ip)
                 conf = RoomConfig(
                     name=name,
                     port=port,
                     advertise_ip=ip,
-                    bind_ip=netdetect.bind_address_for(ip),
+                    bind_ip=bind,
                     password=password,
                     max_users=max_users,
                     host_user=self.username,
+                    frp=frp,
                 )
                 server = RoomServer(conf)
                 try:
@@ -609,27 +722,30 @@ class App:
 
     def screen_join(self) -> str:
         saved = cfg.load()
-        f_host = Field("Room IP", str(saved.get("last_host") or ""), 0, 0, 42, hint="IPv6 / IPv4 / Radmin VPN IP")
-        f_port = Field("Port", str(saved.get("last_port") or 9001), 0, 0, 12)
+        f_host = Field("Room IP", str(saved.get("last_host") or ""), 0, 0, 42, hint="IPv6 / IPv4 / VPN / FRP host")
+        f_port = Field("Port", str(saved.get("last_port") or 9001), 0, 0, 12, hint="remote port on the FRP server")
         f_pass = Field("Password", "", 0, 0, 24, secret=True)
+        f_admin = Field("Admin token", "", 0, 0, 34, secret=True, hint="host only, from headless server")
         while True:
             self.frame("Join a room")
-            self.start_fields([f_host, f_port, f_pass])
+            self.start_fields([f_host, f_port, f_pass, f_admin])
             self.draw(2, 4, "Enter the room IP + port, check the room, then enter the password.", self.color("dim"))
             f_host.y, f_host.x = 4, 6
             f_port.y, f_port.x = 5, 6
             f_pass.y, f_pass.x = 9, 6
+            f_admin.y, f_admin.x = 10, 6
             for f in self.fields:
                 self.field(f)
             x = self.button(6, 6, "Check Room", lambda: "check")
             self.button(6, x, "Back", lambda: "menu", self.color("dim"))
             if self.probed:
-                self.draw(8, 6, f"FOUND: {self.probed.get('name')}  |  host {self.probed.get('host')}  |  {self.probed.get('users')}/{self.probed.get('max_users')} members", self.color("ok"))
+                tag = "  |  FRP exit" if self.probed.get("frp") else ""
+                self.draw(8, 6, clip(f"FOUND: {self.probed.get('name')}  |  host {self.probed.get('host')}  |  {self.probed.get('users')}/{self.probed.get('max_users')} members{tag}", self.w - 10), self.color("ok"))
             else:
                 self.draw(8, 6, "No room checked yet.", self.color("dim"))
-            x = self.button(10, 6, "Join Room", lambda: "join")
-            self.button(10, x, "Cancel", lambda: "menu", self.color("dim"))
-            self.draw(12, 6, "The app first probes the address. Only if a live CC-2.0 room answers is the password requested.", self.color("dim"))
+            x = self.button(11, 6, "Join Room", lambda: "join")
+            self.button(11, x, "Cancel", lambda: "menu", self.color("dim"))
+            self.draw(13, 6, "FRP rooms use the FRP server address + remote port. The app probes before asking for a password.", self.color("dim"))
             self.footer_status()
             self.stdscr.refresh()
             result = self.handle_base(self.key(), back="menu")
@@ -668,9 +784,10 @@ class App:
                     self.say("This room requires a password.")
                     self.focus = f_pass
                     continue
+                self.admin_token = f_admin.value.strip()
                 client = ChatClient()
                 try:
-                    client.connect(host, port, self.username, f_pass.value)
+                    client.connect(host, port, self.username, f_pass.value, admin_token=self.admin_token)
                 except ClientError as exc:
                     self.say(str(exc))
                     continue
@@ -695,6 +812,10 @@ class App:
         self.scroll = 0
         self.push_line(f"Connected to '{name}' at {endpoint}", "ok")
         self.push_line("Messages and files here are end-to-end encrypted with the room password.", "dim")
+        if server is not None and server.config.frp is not None:
+            frp = server.config.frp
+            self.push_line(f"FRP exit for guests: {frp.endpoint} (local port {frp.local_port})", "ok")
+            self.push_line("Keep your frpc tunnel running: localPort = room port, remotePort = FRP exit port.", "dim")
         self.cipher_mode = "v2" if has_aes_gcm() else "v1"
 
     def push_line(self, text: str, style: str = "dim") -> None:
@@ -951,6 +1072,8 @@ class App:
                     screen = self.screen_join()
                 elif screen == "addresses":
                     screen = self.screen_addresses(pick=self.addr_pick)
+                elif screen == "frp":
+                    screen = self.screen_frp()
                 elif screen == "chat":
                     screen = self.screen_chat()
                 else:

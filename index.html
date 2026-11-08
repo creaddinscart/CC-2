@@ -194,7 +194,7 @@ footer a { color: var(--muted); margin: 0 8px; }
 
 <section class="hero" id="top">
   <div class="top">
-    <div class="wrap"><span>CC-2.0 / ChatClient</span><div><a href="#how-to-use">How to use</a><a href="#start">Guide</a><a href="#downloads">Download</a></div></div>
+    <div class="wrap"><span>CC-2.0 / ChatClient</span><div><a href="#how-to-use">How to use</a><a href="#start">Guide</a><a href="#frp">FRP</a><a href="#downloads">Download</a></div></div>
   </div>
   <div class="wrap hero-in">
     <div class="mark">
@@ -205,7 +205,7 @@ footer a { color: var(--muted); margin: 0 8px; }
     <div class="log">
       <a href="#downloads"><span>Terminal Edition 1.0.0 released</span><i>11-07</i></a>
       <a href="#how-to-use"><span>One ZIP contains everything</span><i>11-07</i></a>
-      <a href="#reference"><span>MPL-2.0 license added</span><i>11-07</i></a>
+      <a href="#frp"><span>FRP exit publishing added</span><i>11-08</i></a>
       <a class="more" href="#start">More &gt;</a>
     </div>
     <div class="rounds">
@@ -218,7 +218,7 @@ footer a { color: var(--muted); margin: 0 8px; }
       <a class="round" href="#downloads" title="Inside the ZIP"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg><span>In the ZIP</span></a>
     </div>
     <div class="pills">
-      <a class="pill main" href="release/CC-2.0.zip" download>Download CC-2.0.zip <span>47.6 KB</span></a>
+      <a class="pill main" href="release/CC-2.0.zip" download>Download CC-2.0.zip <span>55.3 KB</span></a>
       <a class="pill" href="#how-to-use">How to use</a>
       <a class="pill" href="#downloads">What's inside</a>
     </div>
@@ -231,7 +231,7 @@ footer a { color: var(--muted); margin: 0 8px; }
   <section id="how-to-use">
     <h2>Getting started</h2>
     <ol class="plain">
-      <li>Download <a href="release/CC-2.0.zip" download>CC-2.0.zip</a> (47.6 KB). It is the only download on this page.</li>
+      <li>Download <a href="release/CC-2.0.zip" download>CC-2.0.zip</a> (55.3 KB). It is the only download on this page.</li>
       <li>Unzip the whole folder anywhere. Keep the files together.</li>
       <li>Open the launcher for your system, then pick <b>1 Terminal UI</b> in the menu.</li>
     </ol>
@@ -266,7 +266,7 @@ footer a { color: var(--muted); margin: 0 8px; }
     <div class="flow">
       <div><b>Your terminal</b><p>curses client, local key derivation, file picker.</p><ul><li><b>Password</b> never leaves the client</li><li><b>Key</b> from password + room salt</li><li><b>Plaintext</b> stays in RAM</li></ul></div>
       <div class="mid"><b>Temporary room server</b><p>Bound to your chosen port. Stops when the room closes.</p><ul><li><b>Sees</b> ciphertext, usernames, timestamps</li><li><b>Stores</b> a separate auth verifier</li><li><b>Cannot</b> recover the message key</li><li><b>Cannot</b> read text or files</li></ul></div>
-      <div><b>Peer terminals</b><p>Connect by IP + port, probe, then unlock with the password.</p><ul><li><b>IPv6</b> preferred</li><li><b>Caps</b> negotiated across members</li><li><b>History</b> replayed as ciphertext</li></ul></div>
+      <div><b>Peer terminals</b><p>Connect by IP + port, probe, then unlock with the password.</p><ul><li><b>IPv6</b> preferred</li><li><b>FRP exit</b> when NAT blocks inbound</li><li><b>History</b> replayed as ciphertext</li></ul></div>
     </div>
     <p class="note"><b>Trust model.</b> The password is the only key source and must be shared out of band. If any member lacks the optional <code>cryptography</code> package, the whole room falls back to the built-in HMAC-CTR cipher.</p>
   </section>
@@ -294,8 +294,8 @@ footer a { color: var(--muted); margin: 0 8px; }
 <span class="p">$</span> python3 launch.py --test</pre></div></div>
     <ol class="steps">
       <li><div><h3>Choose a username</h3><p>On first run, pick a username. It is saved in <code>~/.cc2/config.json</code>. The menu also has a Change Username button.</p></div></li>
-      <li><div><h3>Host: create a room</h3><p>Enter room name, port, communication IP, password and maximum members. IPv6 global is preferred; the transport list is auto-detected. Creating the room starts the temporary server and opens chat.</p><div class="chips"><span class="chip">Name <b>night-shift</b></span><span class="chip">Port <b>7777</b></span><span class="chip">Cap <b>8</b></span></div></div></li>
-      <li><div><h3>Guest: check the room</h3><p>Enter the host's IP + port and click Check Room. The room replies with its name, host, member count and capacity. Only then is the password requested.</p></div></li>
+      <li><div><h3>Host: create a room</h3><p>Enter room name, port, communication IP, password and maximum members. IPv6 global is preferred; the transport list is auto-detected. Behind NAT, click FRP Exit to publish a public address. Creating the room starts the temporary server and opens chat.</p><div class="chips"><span class="chip">Name <b>night-shift</b></span><span class="chip">Port <b>7777</b></span><span class="chip">Cap <b>8</b></span></div></div></li>
+      <li><div><h3>Guest: check the room</h3><p>Enter the host's IP + port (or the FRP server address + remote port) and click Check Room. The room replies with its name, host, member count and capacity. Only then is the password requested.</p></div></li>
       <li><div><h3>Chat and send files</h3><p>Type and press ENTER. Peers see who is typing. Click File to open the picker; files are encrypted, chunked and reassembled into <code>~/Downloads/CC-2.0/</code>. TAB, arrows, ENTER and ESC work as keyboard alternatives.</p></div></li>
       <li><div><h3>Host: tune the room</h3><p>Change the member cap at any time, kick a member, or close the room. Closing stops the temporary server.</p></div></li>
     </ol>
@@ -310,19 +310,42 @@ footer a { color: var(--muted); margin: 0 8px; }
       <li><div><b>LAN</b><small>local network</small></div><span>Same Wi-Fi or Ethernet. Simplest for one building.</span></li>
       <li><div><b>Loopback</b><small>local testing</small></div><span>127.0.0.1 / ::1 for a single-machine test with two terminals.</span></li>
     </ol>
-    <p class="note"><b>If a peer cannot connect:</b> check the firewall, port forwarding, VPN membership and the advertised IP. Use <code>python3 cc2_server.py --list-addresses</code> to see what the host detects.</p>
+    <p class="note"><b>If a peer cannot connect:</b> check the firewall, port forwarding, VPN membership and the advertised IP. Use <code>python3 cc2_server.py --list-addresses</code> to see what the host detects. With no reachable address at all, use an <a href="#frp">FRP exit</a>.</p>
+  </section>
+
+  <section id="frp">
+    <h2>FRP exit</h2>
+    <p>No public IP or stuck behind CGNAT? Set it up <b>exactly like a Minecraft server</b>: download a third-party FRP client, map a public port to the room's local port, and start it. CC-2.0 does not install, configure or run <code>frpc</code> - it only needs the public <code>host:port</code> that guests connect to.</p>
+    <div class="code"><div class="codebar"><span>topology</span></div><pre>guest --&gt; frps:25565 == tunnel ==&gt; frpc --&gt; 127.0.0.1:9001 (room)</pre></div>
+    <ol class="plain">
+      <li>In <b>your own FRP client</b>, add a plain <code>tcp</code> proxy. Set <code>localPort</code> to the CC-2.0 room port and <code>remotePort</code> to the public port you will share. The two can differ.</li>
+      <li>Start <code>frpc</code> and keep it running. Its server address, control port, token and proxy name stay in your FRP client - CC-2.0 never asks for them and writes no config files.</li>
+      <li>In CC-2.0 open <b>Main menu / FRP Exit</b> (or the FRP Exit button on the Create Room form) and enter one address: <code>frp.example.com:25565</code>. Switch FRP on and click Save.</li>
+      <li>Guests enter that host + port, click Check Room, then enter the password. They need no FRP software and never see your local port.</li>
+    </ol>
+    <div class="code"><div class="codebar"><span>frpc.toml in your own FRP client</span><button class="copy" type="button">copy</button></div><pre>serverAddr = "frp.example.com"
+serverPort = 7000
+
+[[proxies]]
+name = "cc2"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 9001
+remotePort = 25565</pre></div>
+    <div class="code"><div class="codebar"><span>headless host</span><button class="copy" type="button">copy</button></div><pre><span class="p">$</span> python3 cc2_server.py --name "Night Shift" --port 9001 --password 'long-password' --frp frp.example.com:25565</pre></div>
+    <p class="note"><b>Note.</b> This is the same mapping you would use for a Minecraft server on <code>25565</code>. Keep <code>frpc</code> running and open the remote port on the FRP server firewall. Use a plain <code>tcp</code> proxy: the FRP PROXY protocol prepends bytes that break CC-2.0 framing. In FRP rooms host rights require the admin token printed by the headless server; paste it into the Admin token field on the Join Room form. The FRP server only relays ciphertext, never the password or the key.</p>
   </section>
 
   <section id="downloads">
     <h2>Download</h2>
     <div class="lead">
-      <div><b>CC-2.0.zip</b> <span class="size">47.6 KB</span><p class="small" style="margin:2px 0 0">20 files. Terminal client, headless server, launchers and docs.</p></div>
+      <div><b>CC-2.0.zip</b> <span class="size">55.3 KB</span><p class="small" style="margin:2px 0 0">21 files. Terminal client, headless server, launchers and docs.</p></div>
       <a class="btn" href="release/CC-2.0.zip" download>Download</a>
     </div>
     <p class="small" style="margin-top:14px">Individual files are not downloadable. The list below shows what is inside the archive. <a href="#how-to-use">Quick start</a></p>
     <div class="tools">
       <input class="search" id="q" type="search" placeholder="Filter files inside the archive..." aria-label="Filter files">
-      <span class="meta" id="count">20 files &middot; generated 2026-11-08 04:01</span>
+      <span class="meta" id="count">21 files &middot; generated 2026-11-08 05:04</span>
     </div>
     <div class="filebox">
       <div class="filehead"><span>File</span><span>Description</span><span style="text-align:right">Size</span><span style="text-align:right"></span></div>
@@ -339,6 +362,8 @@ footer a { color: var(--muted); margin: 0 8px; }
           <tr><td>python3 launch.py</td><td>Mode menu</td></tr>
           <tr><td>python3 cc2_cli.py</td><td>Terminal client</td></tr>
           <tr><td>python3 cc2_server.py --list-addresses</td><td>Detected addresses</td></tr>
+          <tr><td>python3 cc2_server.py --frp H:P</td><td>Publish a public FRP exit</td></tr>
+          <tr><td>frpc -c frpc.toml</td><td>Start the tunnel in your own FRP client</td></tr>
           <tr><td>python3 build_release.py</td><td>Rebuild the ZIP</td></tr>
           <tr><td>python3 build_docs.py</td><td>Rebuild this page</td></tr>
           <tr><td>python3 build_favicon.py</td><td>Rebuild the icons</td></tr>
@@ -351,6 +376,8 @@ footer a { color: var(--muted); margin: 0 8px; }
           <li><b>Windows curses error</b> - install <code>windows-curses</code>.</li>
           <li><b>Old messages unreadable</b> - a new password makes a new key; cached history is skipped.</li>
           <li><b>No AES-GCM</b> - the room falls back to HMAC-CTR automatically.</li>
+          <li><b>FRP exit silent</b> - start frpc, open the remote port, keep localPort equal to the room port.</li>
+          <li><b>FRP probe malformed</b> - disable the FRP PROXY protocol on that proxy.</li>
         </ul>
       </div>
       <div>
@@ -361,6 +388,8 @@ footer a { color: var(--muted); margin: 0 8px; }
           <li>No forward secrecy, no identity check beyond the shared password.</li>
           <li>Share the password over a different channel than the address.</li>
           <li>Closing the room stops the server and drops in-memory state.</li>
+          <li>An FRP server relays ciphertext only. It cannot read messages or files.</li>
+          <li>FRP rooms require the admin token for host rights.</li>
         </ul>
         <h3 style="margin-top:24px">Build</h3>
         <ul>
@@ -371,7 +400,7 @@ footer a { color: var(--muted); margin: 0 8px; }
         </ul>
       </div>
     </div>
-    <p class="tail">27 / 27 core protocol checks &middot; 8 / 8 terminal mouse checks &middot; 20 files in the release package.</p>
+    <p class="tail">50 / 50 core protocol checks &middot; 9 / 9 terminal mouse checks &middot; 21 files in the release package.</p>
   </section>
 
 </div>
@@ -379,12 +408,12 @@ footer a { color: var(--muted); margin: 0 8px; }
 
 <footer>
   <div class="wrap">
-    <a href="#top">CC-2.0 / ChatClient</a><a href="#how-to-use">How to use</a><a href="#start">Guide</a><a href="#downloads">Download</a><a href="#reference">Reference</a>
-    <div style="margin-top:10px">Jointly built by Creaddinscart Teams &amp; CC Team &middot; MPL-2.0 &middot; generated 2026-11-08 04:01</div>
+    <a href="#top">CC-2.0 / ChatClient</a><a href="#how-to-use">How to use</a><a href="#start">Guide</a><a href="#frp">FRP</a><a href="#downloads">Download</a><a href="#reference">Reference</a>
+    <div style="margin-top:10px">Jointly built by Creaddinscart Teams &amp; CC Team &middot; MPL-2.0 &middot; generated 2026-11-08 05:04</div>
   </div>
 </footer>
 
-<script id="manifest" type="application/json">[{"path":"README.md","size":"8.9 KB","bytes":9157,"note":"Project overview and architecture","hi":false},{"path":"USAGE.md","size":"9.3 KB","bytes":9474,"note":"Full step-by-step user guide","hi":false},{"path":"LICENSE","size":"16.3 KB","bytes":16726,"note":"Mozilla Public License 2.0 full text","hi":false},{"path":"NOTICE","size":"1.4 KB","bytes":1431,"note":"Copyright and third-party notices","hi":false},{"path":"requirements.txt","size":"65 B","bytes":65,"note":"Optional dependencies","hi":false},{"path":"launch.py","size":"3.0 KB","bytes":3040,"note":"Unified three-mode launcher","hi":false},{"path":"cc2_cli.py","size":"42.6 KB","bytes":43598,"note":"Mouse-clickable curses terminal client","hi":false},{"path":"cc2_server.py","size":"3.3 KB","bytes":3418,"note":"Headless room server entry point","hi":false},{"path":"build_release.py","size":"3.3 KB","bytes":3354,"note":"Rebuild the release folder and ZIP","hi":false},{"path":"build_docs.py","size":"9.8 KB","bytes":10062,"note":"Generate this page and serve the download root","hi":false},{"path":"build_favicon.py","size":"3.7 KB","bytes":3756,"note":"Regenerate every favicon asset","hi":false},{"path":"CC-2.0.command","size":"538 B","bytes":538,"note":"macOS double-click launcher","hi":false},{"path":"CC-2.0.sh","size":"598 B","bytes":598,"note":"Linux launcher","hi":false},{"path":"CC-2.0.bat","size":"657 B","bytes":657,"note":"Windows launcher","hi":false},{"path":"favicon.svg","size":"912 B","bytes":912,"note":"Browser tab icon, vector version","hi":false},{"path":"favicon.ico","size":"4.4 KB","bytes":4512,"note":"Browser tab icon, 16 / 32 / 48 ICO bundle","hi":false},{"path":"favicon-16.png","size":"679 B","bytes":679,"note":"Browser tab icon, 16px simplified","hi":false},{"path":"favicon-32.png","size":"1.4 KB","bytes":1478,"note":"Browser tab icon, 32px","hi":false},{"path":"favicon-48.png","size":"2.2 KB","bytes":2301,"note":"Browser tab icon, 48px","hi":false},{"path":"apple-touch-icon.png","size":"5.4 KB","bytes":5542,"note":"iOS home screen icon, 180px","hi":false},{"path":"index.html","size":"37.2 KB","bytes":38102,"note":"This documentation and download page","hi":false},{"path":"CNAME","size":"11 B","bytes":11,"note":"Project source file","hi":false},{"path":"cc2/__init__.py","size":"494 B","bytes":494,"note":"Public package exports","hi":false},{"path":"cc2/brand.py","size":"1.2 KB","bytes":1273,"note":"Application name, version and credits","hi":false},{"path":"cc2/client.py","size":"14.1 KB","bytes":14437,"note":"Client network layer and file transfer","hi":false},{"path":"cc2/config.py","size":"2.3 KB","bytes":2336,"note":"Local username and preferences","hi":false},{"path":"cc2/crypto.py","size":"3.7 KB","bytes":3819,"note":"Key derivation and authenticated encryption","hi":false},{"path":"cc2/netdetect.py","size":"8.1 KB","bytes":8273,"note":"IPv6, IPv4, VPN and LAN discovery","hi":false},{"path":"cc2/protocol.py","size":"3.6 KB","bytes":3672,"note":"Framing, constants and room probe","hi":false},{"path":"cc2/server.py","size":"19.2 KB","bytes":19651,"note":"Temporary room server and ciphertext relay","hi":false},{"path":"tests/selftest.py","size":"7.4 KB","bytes":7548,"note":"27 core protocol and encryption checks","hi":false},{"path":"tests/tui_smoke.py","size":"3.3 KB","bytes":3350,"note":"8 pseudo-terminal mouse interaction checks","hi":false},{"path":"release/CC-2.0.zip","size":"47.6 KB","bytes":48766,"note":"Ready-to-run Terminal Edition archive","hi":true},{"path":"release/CC-2.0/CC-2.0.bat","size":"657 B","bytes":657,"note":"Windows launcher","hi":false},{"path":"release/CC-2.0/CC-2.0.command","size":"538 B","bytes":538,"note":"macOS launcher","hi":false},{"path":"release/CC-2.0/CC-2.0.sh","size":"598 B","bytes":598,"note":"Linux launcher","hi":false},{"path":"release/CC-2.0/LICENSE","size":"16.3 KB","bytes":16726,"note":"Release package file","hi":false},{"path":"release/CC-2.0/NOTICE","size":"1.4 KB","bytes":1431,"note":"Release package file","hi":false},{"path":"release/CC-2.0/README.md","size":"8.9 KB","bytes":9157,"note":"Release overview","hi":false},{"path":"release/CC-2.0/START-HERE.md","size":"1.5 KB","bytes":1488,"note":"Quick start inside the release package","hi":false},{"path":"release/CC-2.0/USAGE.md","size":"9.3 KB","bytes":9474,"note":"Release user guide","hi":false},{"path":"release/CC-2.0/cc2/__init__.py","size":"494 B","bytes":494,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/brand.py","size":"1.2 KB","bytes":1273,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/client.py","size":"14.1 KB","bytes":14437,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/config.py","size":"2.3 KB","bytes":2336,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/crypto.py","size":"3.7 KB","bytes":3819,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/netdetect.py","size":"8.1 KB","bytes":8273,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/protocol.py","size":"3.6 KB","bytes":3672,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/server.py","size":"19.2 KB","bytes":19651,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2_cli.py","size":"42.6 KB","bytes":43598,"note":"Release terminal client","hi":false},{"path":"release/CC-2.0/cc2_server.py","size":"3.3 KB","bytes":3418,"note":"Release headless server","hi":false},{"path":"release/CC-2.0/launch.py","size":"3.0 KB","bytes":3040,"note":"Release launcher","hi":false},{"path":"release/CC-2.0/requirements.txt","size":"65 B","bytes":65,"note":"Release package file","hi":false}]</script>
+<script id="manifest" type="application/json">[{"path":"README.md","size":"12.0 KB","bytes":12337,"note":"Project overview and architecture","hi":false},{"path":"USAGE.md","size":"14.3 KB","bytes":14643,"note":"Full step-by-step user guide","hi":false},{"path":"LICENSE","size":"16.3 KB","bytes":16726,"note":"Mozilla Public License 2.0 full text","hi":false},{"path":"NOTICE","size":"1.6 KB","bytes":1686,"note":"Copyright and third-party notices","hi":false},{"path":"requirements.txt","size":"65 B","bytes":65,"note":"Optional dependencies","hi":false},{"path":"launch.py","size":"3.0 KB","bytes":3040,"note":"Unified three-mode launcher","hi":false},{"path":"cc2_cli.py","size":"49.4 KB","bytes":50579,"note":"Mouse-clickable curses terminal client","hi":false},{"path":"cc2_server.py","size":"5.9 KB","bytes":6031,"note":"Headless room server entry point","hi":false},{"path":"build_release.py","size":"4.3 KB","bytes":4367,"note":"Rebuild the release folder and ZIP","hi":false},{"path":"build_docs.py","size":"9.9 KB","bytes":10134,"note":"Generate this page and serve the download root","hi":false},{"path":"build_favicon.py","size":"3.7 KB","bytes":3756,"note":"Regenerate every favicon asset","hi":false},{"path":"CC-2.0.command","size":"538 B","bytes":538,"note":"macOS double-click launcher","hi":false},{"path":"CC-2.0.sh","size":"598 B","bytes":598,"note":"Linux launcher","hi":false},{"path":"CC-2.0.bat","size":"657 B","bytes":657,"note":"Windows launcher","hi":false},{"path":"favicon.svg","size":"912 B","bytes":912,"note":"Browser tab icon, vector version","hi":false},{"path":"favicon.ico","size":"4.4 KB","bytes":4512,"note":"Browser tab icon, 16 / 32 / 48 ICO bundle","hi":false},{"path":"favicon-16.png","size":"679 B","bytes":679,"note":"Browser tab icon, 16px simplified","hi":false},{"path":"favicon-32.png","size":"1.4 KB","bytes":1478,"note":"Browser tab icon, 32px","hi":false},{"path":"favicon-48.png","size":"2.2 KB","bytes":2301,"note":"Browser tab icon, 48px","hi":false},{"path":"apple-touch-icon.png","size":"5.4 KB","bytes":5542,"note":"iOS home screen icon, 180px","hi":false},{"path":"index.html","size":"41.1 KB","bytes":42056,"note":"This documentation and download page","hi":false},{"path":"CNAME","size":"11 B","bytes":11,"note":"Project source file","hi":false},{"path":"cc2/__init__.py","size":"667 B","bytes":667,"note":"Public package exports","hi":false},{"path":"cc2/brand.py","size":"1.2 KB","bytes":1273,"note":"Application name, version and credits","hi":false},{"path":"cc2/client.py","size":"14.1 KB","bytes":14437,"note":"Client network layer and file transfer","hi":false},{"path":"cc2/config.py","size":"2.3 KB","bytes":2386,"note":"Local username and preferences","hi":false},{"path":"cc2/crypto.py","size":"3.7 KB","bytes":3819,"note":"Key derivation and authenticated encryption","hi":false},{"path":"cc2/frp.py","size":"3.7 KB","bytes":3743,"note":"FRP public exit parsing and endpoint handling","hi":false},{"path":"cc2/netdetect.py","size":"8.1 KB","bytes":8273,"note":"IPv6, IPv4, VPN and LAN discovery","hi":false},{"path":"cc2/protocol.py","size":"3.6 KB","bytes":3672,"note":"Framing, constants and room probe","hi":false},{"path":"cc2/server.py","size":"20.3 KB","bytes":20751,"note":"Temporary room server and ciphertext relay","hi":false},{"path":"tests/selftest.py","size":"12.2 KB","bytes":12480,"note":"50 core protocol, encryption and FRP checks","hi":false},{"path":"tests/tui_smoke.py","size":"3.5 KB","bytes":3548,"note":"9 pseudo-terminal mouse interaction checks","hi":false},{"path":"release/CC-2.0.zip","size":"55.3 KB","bytes":56661,"note":"Ready-to-run Terminal Edition archive","hi":true},{"path":"release/CC-2.0/CC-2.0.bat","size":"657 B","bytes":657,"note":"Windows launcher","hi":false},{"path":"release/CC-2.0/CC-2.0.command","size":"538 B","bytes":538,"note":"macOS launcher","hi":false},{"path":"release/CC-2.0/CC-2.0.sh","size":"598 B","bytes":598,"note":"Linux launcher","hi":false},{"path":"release/CC-2.0/LICENSE","size":"16.3 KB","bytes":16726,"note":"Release package file","hi":false},{"path":"release/CC-2.0/NOTICE","size":"1.6 KB","bytes":1686,"note":"Release package file","hi":false},{"path":"release/CC-2.0/README.md","size":"12.0 KB","bytes":12337,"note":"Release overview","hi":false},{"path":"release/CC-2.0/START-HERE.md","size":"2.4 KB","bytes":2501,"note":"Quick start inside the release package","hi":false},{"path":"release/CC-2.0/USAGE.md","size":"14.3 KB","bytes":14643,"note":"Release user guide","hi":false},{"path":"release/CC-2.0/cc2/__init__.py","size":"667 B","bytes":667,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/brand.py","size":"1.2 KB","bytes":1273,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/client.py","size":"14.1 KB","bytes":14437,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/config.py","size":"2.3 KB","bytes":2386,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/crypto.py","size":"3.7 KB","bytes":3819,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/frp.py","size":"3.7 KB","bytes":3743,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/netdetect.py","size":"8.1 KB","bytes":8273,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/protocol.py","size":"3.6 KB","bytes":3672,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2/server.py","size":"20.3 KB","bytes":20751,"note":"Release package core module","hi":false},{"path":"release/CC-2.0/cc2_cli.py","size":"49.4 KB","bytes":50579,"note":"Release terminal client","hi":false},{"path":"release/CC-2.0/cc2_server.py","size":"5.9 KB","bytes":6031,"note":"Release headless server","hi":false},{"path":"release/CC-2.0/launch.py","size":"3.0 KB","bytes":3040,"note":"Release launcher","hi":false},{"path":"release/CC-2.0/requirements.txt","size":"65 B","bytes":65,"note":"Release package file","hi":false}]</script>
 <script>
 (function () {
   var all = [];
@@ -396,7 +425,7 @@ footer a { color: var(--muted); margin: 0 8px; }
   var box = document.getElementById('files');
   var q = document.getElementById('q');
   var count = document.getElementById('count');
-  var generated = '2026-11-08 04:01';
+  var generated = '2026-11-08 05:04';
 
   function row(item) {
     var el = document.createElement('div');

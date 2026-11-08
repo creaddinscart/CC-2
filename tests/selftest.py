@@ -16,6 +16,7 @@ import socket
 import struct
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -23,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cc2 import crypto, netdetect, protocol as P
 from cc2.client import ChatClient, ClientError
+from cc2.frp import FRPConfig, FRPError, bind_ip_for_tunnel, parse_address, split_address
 from cc2.server import RoomConfig, RoomServer
 
 PASS, FAIL = 0, 0
@@ -202,6 +204,114 @@ def main() -> int:
     ws_info = recv_ws_text(ws)
     check("WS probe returns room info", ws_info.get("t") == P.ROOM_INFO, str(ws_info)[:120])
     ws.close()
+
+    print("\n== FRP exit ==")
+    check("FRP address parses a domain", parse_address("frp.example.com", 7000) == ("frp.example.com", 7000))
+    check("FRP address parses host:port", parse_address("1.2.3.4:19001") == ("1.2.3.4", 19001))
+    check("FRP address parses bracketed IPv6", parse_address("[2001:db8::1]:7500") == ("2001:db8::1", 7500))
+    check("FRP address parses a scheme", parse_address("frp://tunnel.example.net:19001") == ("tunnel.example.net", 19001))
+    check("FRP split keeps bare IPv6 portless", split_address("2001:db8::1") == ("2001:db8::1", None))
+    check("FRP split extracts an explicit port", split_address("frp.example.com:19001") == ("frp.example.com", 19001))
+    try:
+        parse_address("bad host:123")
+        check("FRP rejects unsafe characters", False)
+    except FRPError:
+        check("FRP rejects unsafe characters", True)
+
+    local_port = free_port()
+    remote_port = free_port()
+    while remote_port == local_port:
+        remote_port = free_port()
+    tunnel = FRPConfig.from_endpoint(f"127.0.0.1:{remote_port}", local_port)
+    check("FRP exit is built from one string", tunnel.server_addr == "127.0.0.1" and tunnel.remote_port == remote_port)
+    check("FRP endpoint uses the remote port", tunnel.endpoint == f"127.0.0.1:{remote_port}", tunnel.endpoint)
+    check("FRP keeps the local room port", tunnel.local_port == local_port)
+    check("FRP maps local to public", tunnel.describe() == f"127.0.0.1:{local_port} -> 127.0.0.1:{remote_port}")
+    try:
+        FRPConfig.from_endpoint("frp.example.com", local_port)
+        check("FRP exit requires an explicit port", False)
+    except FRPError:
+        check("FRP exit requires an explicit port", True)
+
+    stop_relay = threading.Event()
+    relay_listener = socket.socket()
+    relay_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    relay_listener.bind(("127.0.0.1", remote_port))
+    relay_listener.listen(16)
+    relay_listener.settimeout(0.2)
+
+    def pump(src, dst) -> None:
+        try:
+            while True:
+                data = src.recv(65536)
+                if not data:
+                    break
+                dst.sendall(data)
+        except OSError:
+            pass
+        finally:
+            try:
+                dst.shutdown(socket.SHUT_WR)
+            except OSError:
+                pass
+
+    def relay_loop() -> None:
+        while not stop_relay.is_set():
+            try:
+                incoming, _ = relay_listener.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            try:
+                outgoing = socket.create_connection(("127.0.0.1", local_port), timeout=3)
+            except OSError:
+                incoming.close()
+                continue
+            threading.Thread(target=pump, args=(incoming, outgoing), daemon=True).start()
+            threading.Thread(target=pump, args=(outgoing, incoming), daemon=True).start()
+
+    threading.Thread(target=relay_loop, daemon=True).start()
+
+    fconf = RoomConfig(
+        name="FRP Lab",
+        port=local_port,
+        advertise_ip="127.0.0.1",
+        bind_ip=bind_ip_for_tunnel(),
+        password="tunnel-pass",
+        max_users=4,
+        host_user="Operator",
+        frp=tunnel,
+    )
+    fserver = RoomServer(fconf)
+    fserver.start()
+    check("FRP room advertises the public exit", fconf.endpoint == tunnel.endpoint)
+    check("FRP room keeps a private local endpoint", fconf.local_endpoint == f"127.0.0.1:{local_port}")
+    check("FRP join port differs from local port", fconf.join_port == remote_port and fconf.join_port != fconf.port)
+
+    finfo = tunnel.probe_exit(3.0)
+    check("FRP exit is discoverable", bool(finfo and finfo.get("t") == P.ROOM_INFO))
+    check("probe advertises FRP", bool(finfo and finfo.get("frp") is True))
+    check("probe publishes the FRP endpoint", bool(finfo and finfo.get("frp_endpoint") == tunnel.endpoint))
+    check("probe publishes the join port", bool(finfo and finfo.get("join_port") == remote_port))
+    time.sleep(0.2)
+
+    remote_peer = ChatClient()
+    remote_peer.connect(tunnel.server_addr, tunnel.remote_port, "Operator", "tunnel-pass")
+    check("FRP guest can join through the exit", remote_peer.connected)
+    check("FRP blocks loopback host impersonation", not remote_peer.is_host)
+
+    admin = ChatClient()
+    admin.connect(tunnel.server_addr, tunnel.remote_port, "Admin", "tunnel-pass", admin_token=fconf.admin_token)
+    check("FRP host rights require the admin token", admin.is_host)
+    remote_peer.send_text("through the tunnel")
+    fmsg = drain(admin, "message")
+    check("message crosses the FRP exit", bool(fmsg and fmsg.get("text") == "through the tunnel"))
+    admin.leave()
+    remote_peer.leave()
+    fserver.stop()
+    stop_relay.set()
+    relay_listener.close()
 
     print("\n== shutdown ==")
     a.leave()

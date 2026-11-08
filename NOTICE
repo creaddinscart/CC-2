@@ -23,6 +23,10 @@ Third-party components (not bundled, used at runtime):
   * cryptography (Apache-2.0 OR BSD-3-Clause) - OPTIONAL, enables AES-GCM.
   * windows-curses (MIT/X) - OPTIONAL on other platforms, required for the
     mouse-driven terminal UI on Windows.
+  * frp / frpc (Apache-2.0) - OPTIONAL, NOT bundled. The user downloads a
+    third-party FRP client and configures the tcp tunnel themselves, exactly
+    as for a Minecraft server. CC-2.0 neither generates config files for it
+    nor starts the process.
 
 Project documentation: README.md (overview), USAGE.md (step-by-step guide).
 This build contains the terminal client and the headless room server only.

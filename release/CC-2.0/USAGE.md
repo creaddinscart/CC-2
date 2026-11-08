@@ -110,17 +110,24 @@ the `26.x.x.x` address shown by the Radmin client.
 Firewall: macOS and Windows will ask whether Python may accept incoming connections - allow it.
 On Linux check `ufw` or `firewalld`.
 
+If no address is reachable from the Internet, click **FRP Exit** on this form to publish the room
+through a public FRP server. See [scenario F](#f-public-access-through-an-frp-exit). The address
+shown to peers then becomes the FRP server plus its remote port, not your local port.
+
 ---
 
 ## 4. Join a room (peer)
 
 1. Choose **Join Room**.
-2. Enter the host's **IP** (IPv6 may be pasted with or without brackets) and the **port**.
+2. Enter the host's **IP** (IPv6 may be pasted with or without brackets) and the **port**. For an
+   FRP room use the **FRP server address** and its **remote port** - never the host's local port.
 3. Click **Check Room**. The app probes the address for a live CC-2.0 room:
-   - Found: room name, host, current members and cap are displayed.
+   - Found: room name, host, current members, cap and an `FRP exit` tag are displayed.
    - Not found: check the IP, port, firewall, port forwarding and VPN membership.
 4. Enter the **room password**.
-5. Click **Join Room** to enter the chat.
+5. Optionally enter the **Admin token** when you are the host of a headless FRP room. The headless
+   server prints it at startup. Leave it empty for a normal guest.
+6. Click **Join Room** to enter the chat.
 
 Wrong passwords, a full room and duplicate usernames are rejected with clear messages.
 
@@ -193,6 +200,79 @@ python3 cc2_server.py --list-addresses
 It prints the endpoint and the host admin token; press `Ctrl+C` to close the room.
 Everyone else joins that IP and port from the terminal client.
 
+<a id="f-public-access-through-an-frp-exit"></a>
+### F. Public access through an FRP exit
+
+Use this when the host has **no reachable public address** (CGNAT, mobile hotspot, restrictive
+router) but has a public FRP server. Set it up **exactly like a Minecraft server**: download a
+third-party FRP client (`frpc`) yourself, add a `tcp` proxy that maps a public port to the room's
+local port, and start it. CC-2.0 does not install, configure or run `frpc`; it only needs the
+public `host:port` that peers should connect to.
+
+```
+guest terminal --> frps:25565 --> frpc --> 127.0.0.1:9001 (room server)
+```
+
+**Step 1 - Configure the tunnel in your own FRP client.** Example `frpc.toml` (older clients use
+`frpc.ini`; GUI FRP clients have the same fields):
+
+```toml
+serverAddr = "frp.example.com"
+serverPort = 7000
+
+[[proxies]]
+name = "cc2"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 9001
+remotePort = 25565
+```
+
+This is the same mapping you would use for a Minecraft server on `25565`. `localPort` must equal
+the CC-2.0 room port. `remotePort` is the port you hand to other people; the two can be different.
+`serverAddr`, `serverPort`, any auth token and the proxy name are your FRP client's business - you
+never enter them into CC-2.0. Start `frpc` and keep it running.
+
+**Step 2 - Tell CC-2.0 the public exit.** Terminal UI: main menu / **FRP Exit** (or the **FRP
+Exit** button on the Create Room form). Enter a single address:
+
+```
+frp.example.com:25565
+```
+
+Click `FRP: OFF` to switch it to `FRP: ENABLED`, click **Save**, then **Back**. The dialog shows
+which `localPort` and `remotePort` your `frpc` should use. **Check Exit** optionally verifies that
+the tunnel is up. Create the room afterwards.
+
+Headless server, one flag:
+
+```bash
+python3 cc2_server.py --name "Night Shift" --port 9001 --password 'long-password' --frp frp.example.com:25565
+```
+
+It prints `localPort = 9001` and `remotePort = 25565` as a reminder of what to set in `frpc`.
+`--frp-host` plus `--frp-port` is an equivalent split form; `--frp-check` probes the exit on startup.
+
+**Step 3 - Guests join normally.** Enter `frp.example.com` + port `25565`, click **Check Room**,
+then enter the room password. Guests need no FRP software, no token and no knowledge of the host's
+local port. The room probe itself reports the public endpoint.
+
+**Host rights.** Tunneled connections appear to the room server as coming from loopback, so FRP
+rooms never grant host rights by username alone. A host who created the room in the terminal UI is
+already host. For a headless FRP room, paste the printed `Host admin token` into the **Admin token**
+field on the Join Room form.
+
+**Important details**
+
+- Local and remote ports are independent. `9001` locally and `25565` publicly is normal.
+- Keep `frpc` running the whole time; if it exits, guests lose the room but the room stays alive
+  locally.
+- Do **not** enable `proxy_protocol_version` for this proxy. CC-2.0 expects raw TCP bytes and the
+  PROXY protocol header would break the framing.
+- Open `remotePort` on the FRP server firewall. A failed **Check Exit** / `--frp-check` can also be
+  a router hairpin limitation; guests may still connect.
+- The FRP server sees ciphertext, usernames and timing only. It cannot read messages or files.
+
 ---
 
 ## 7. Command reference
@@ -206,14 +286,22 @@ python3 launch.py --test
 python3 cc2_cli.py
 python3 cc2_server.py --list-addresses
 python3 cc2_server.py --name X --port 9001 --ip 192.168.1.23 --password pw --max-users 8
+python3 cc2_server.py --name X --port 9001 --password pw --frp frp.example.com:25565
+python3 cc2_server.py --name X --port 9001 --password pw --frp frp.example.com:25565 --frp-check
+python3 cc2_server.py --name X --port 9001 --password pw --frp-host frp.example.com --frp-port 25565
 
 python3 tests/selftest.py
 python3 tests/tui_smoke.py
 python3 build_release.py
 ```
 
-Profile: `~/.cc2/config.json` (username, last IP / port / room name, download directory).
-Received files go to `~/Downloads/CC-2.0/`; change `download_dir` in the profile to move it.
+Profile: `~/.cc2/config.json` (username, last IP / port / room name, download directory, FRP
+enabled flag and the single FRP exit string). No FRP credentials are stored by CC-2.0 - those stay
+in your own `frpc` config. Received files go to `~/Downloads/CC-2.0/`; change `download_dir` to
+move it.
+
+Useful `cc2_server.py` FRP flags: `--frp HOST:PORT`, `--frp-host` / `--frp-port`, `--frp-check`.
+`frpc` itself is installed and configured separately.
 
 ---
 
@@ -230,6 +318,10 @@ Received files go to `~/Downloads/CC-2.0/`; change `download_dir` in the profile
 | Windows reports missing curses | `python -m pip install windows-curses` |
 | Screen shows a resize hint | Enlarge the terminal to at least 72x22 |
 | Mouse clicks do nothing | Use a terminal with mouse reporting, or fall back to TAB / ENTER / ESC |
+| FRP exit answers nobody | Start `frpc` after the room, open `remotePort` on `frps`, match `localPort` to the room port |
+| `--frp-check` fails but guests work | Router hairpin blocking; verify from an outside network instead |
+| FRP room probe is malformed | Disable the FRP PROXY protocol; use a plain `tcp` proxy |
+| Headless FRP host is not host | Paste the printed `Host admin token` into the Join Room admin field |
 
 ---
 
@@ -241,6 +333,11 @@ Received files go to `~/Downloads/CC-2.0/`; change `download_dir` in the profile
   count, typing state). It never stores plaintext chat.
 - The zero-dependency fallback is not a standardized AEAD. Install `cryptography` to use
   AES-256-GCM in serious deployments.
+- An FRP server is an extra relay operator: it sees ciphertext, the room name, usernames and
+  traffic timing, but never the password, the key or any plaintext. Use a server you trust and
+  share the room password over a separate channel.
+- FRP rooms require the admin token for host rights; a tunneled guest cannot become host by
+  reusing the host's display name.
 - Licensed under **MPL-2.0**: commercial use, modification and distribution are allowed, but
   **modified MPL-covered source files must stay under MPL-2.0 and remain available in source form**,
   and copyright / license notices must be preserved. Stricter than MIT, without the viral effect of

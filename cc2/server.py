@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 from . import crypto, protocol as P
 from .brand import APP_NAME, PROTOCOL
+from .frp import FRPConfig
 
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -41,16 +42,44 @@ class RoomConfig:
     salt: bytes = field(default_factory=crypto.new_salt)
     admin_token: str = field(default_factory=lambda: os.urandom(16).hex())
     created_at: float = field(default_factory=time.time)
+    frp: FRPConfig | None = None
 
     @property
     def auth(self) -> str:
         return crypto.auth_token(self.password, self.salt)
 
     @property
+    def frp_enabled(self) -> bool:
+        return self.frp is not None
+
+    @property
     def endpoint(self) -> str:
         from .netdetect import format_endpoint
 
+        if self.frp is not None:
+            return self.frp.endpoint
         return format_endpoint(self.advertise_ip, self.port)
+
+    @property
+    def local_endpoint(self) -> str:
+        from .netdetect import format_endpoint
+
+        return format_endpoint(self.advertise_ip, self.port)
+
+    @property
+    def join_port(self) -> int:
+        return self.frp.remote_port if self.frp is not None else self.port
+
+    def public_info(self) -> dict:
+        return {
+            "frp": self.frp is not None,
+            "frp_endpoint": self.frp.endpoint if self.frp is not None else "",
+            "frp_remote_port": self.frp.remote_port if self.frp is not None else 0,
+            "frp_local_port": self.frp.local_port if self.frp is not None else 0,
+            "public_endpoint": self.endpoint,
+            "local_endpoint": self.local_endpoint,
+            "join_port": self.join_port,
+        }
 
 
 class Peer:
@@ -428,6 +457,7 @@ class RoomServer:
             "endpoint": self.config.endpoint,
             "full": state["users"] >= self.config.max_users,
             "ts": P.now(),
+            **self.config.public_info(),
         }
 
     def _dispatch(self, peer: Peer, obj: dict) -> None:
@@ -478,7 +508,7 @@ class RoomServer:
         peer.user = user
         peer.joined = True
         peer.is_host = bool(token and hmac.compare_digest(token, self.config.admin_token)) or (
-            loopback and user == self.config.host_user
+            loopback and user == self.config.host_user and self.config.frp is None
         )
         with self._lock:
             history = list(self.history)
@@ -580,6 +610,7 @@ class RoomServer:
                 "frames_relayed": self.frames,
                 "ciphertext_bytes": self.bytes_relayed,
                 "running": not self._stop.is_set(),
+                **self.config.public_info(),
             }
         )
         return state
