@@ -1,0 +1,28 @@
+CC-2.0 / ChatClient - Terminal Edition
+Copyright (c) 2026 Creaddinscart Teams & CC Team
+Jointly built by Creaddinscart Teams & CC Team
+
+This product is distributed under the terms of the Mozilla Public License,
+v. 2.0 ("MPL-2.0"). The complete license text is in the LICENSE file.
+Each source file carries the corresponding MPL-2.0 Exhibit A notice and an
+SPDX-License-Identifier: MPL-2.0.
+
+What this means in practice:
+  * You may use, copy, modify and distribute this software, including in
+    commercial products.
+  * If you modify an MPL-covered source file and distribute it, that file
+    must stay under MPL-2.0 and remain available in source form.
+  * Copyright and license notices must be preserved.
+  * Patents: you receive an express patent grant, which terminates if you
+    bring a patent infringement claim against this software.
+  * No warranty and no trademark rights are granted.
+
+Third-party components (not bundled, used at runtime):
+  * Python standard library (PSF License Agreement) - required.
+  * curses - part of the Python / OS distribution on macOS and Linux.
+  * cryptography (Apache-2.0 OR BSD-3-Clause) - OPTIONAL, enables AES-GCM.
+  * windows-curses (MIT/X) - OPTIONAL on other platforms, required for the
+    mouse-driven terminal UI on Windows.
+
+Project documentation: README.md (overview), USAGE.md (step-by-step guide).
+This build contains the terminal client and the headless room server only.
